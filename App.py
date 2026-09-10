@@ -546,5 +546,136 @@ def eliminar_habilidad(id):
     return {"Mensaje": f"Habilidad con ID {id} eliminada correctamente"}, 200
 
 
+#-----------------CURSOS-----------------
+
+#registro cursos
+@app.route("/api/registro-cursos/<int:id>", methods = ["POST"])
+def registro_cursos(id):
+    conec = conectar_bd()
+    cursor = conec.cursor(buffered=True)
+    datos = request.json
+    
+    cursor.execute("SELECT id FROM hojas_vida WHERE id = %s", (id,))
+    validar = cursor.fetchone()
+    
+    if validar is None:
+        cursor.close()
+        conec.close()
+        return {"Mensaje": "El id ingresado no existe"}, 404
+
+    sql = """INSERT INTO cursos (hoja_vida_id, nombre) 
+             VALUES (%s, %s)"""
+    valor = (
+        id,
+        datos["nombre"]
+    )
+    
+    cursor.execute(sql, valor)
+    conec.commit()
+    
+    id_generado = cursor.lastrowid
+    cursor.close()
+    conec.close()
+    return {"Mensaje": "Curso creado", "id": id_generado}, 201
+
+
+# Consultar cursos de una hoja de vida
+@app.route("/api/cursos-hv/<int:id>", methods=["GET"])
+def consultar_cursos(id):
+    conec = conectar_bd()
+    cursor = conec.cursor(buffered=True)
+
+    cursor.execute("SELECT id FROM hojas_vida WHERE id = %s", (id,))
+    validar = cursor.fetchone()
+
+    if validar is None:
+        cursor.close()
+        conec.close()
+        return {"Mensaje": "La hoja de vida no existe"}, 404
+
+    cursor.execute("SELECT nombre FROM cursos WHERE hoja_vida_id = %s", (id,))
+    cursos = cursor.fetchall()
+
+    cursor.close()
+    conec.close()
+
+    return {"Mensaje": "Cursos encontrados", "datos": cursos}, 200
+
+
+# Consultar curso por ID
+@app.route("/api/curso/<int:id>", methods=["GET"])
+def consultar_curso(id):
+    conec = conectar_bd()
+    cursor = conec.cursor(dictionary=True)
+
+    cursor.execute("SELECT * FROM cursos WHERE id = %s", (id,))
+    curso = cursor.fetchone()
+
+    cursor.close()
+    conec.close()
+
+    if curso is None:
+        return {"Mensaje": "Curso no encontrado"}, 404
+
+    return {
+        "Mensaje": "Curso encontrado",
+        "datos": curso
+    }
+
+
+# Actualizar curso
+@app.route("/api/actualizar-curso/<int:id>", methods=["PUT"])
+def actualizar_curso(id):
+    conec = conectar_bd()
+    cursor = conec.cursor(buffered=True)
+
+    cursor.execute("SELECT id FROM cursos WHERE id = %s", (id,))
+    validar = cursor.fetchone()
+
+    if validar is None:
+        cursor.close()
+        conec.close()
+        return {"Mensaje": "El curso no existe"}, 404
+
+    datos = request.json
+    nuevo_nombre = datos["nombre"]
+
+    cursor.execute("UPDATE cursos SET nombre = %s WHERE id = %s", (nuevo_nombre, id))
+    conec.commit()
+
+    cursor.close()
+    conec.close()
+
+    return {"Mensaje": f"Curso con ID {id} actualizado correctamente"}, 200
+
+
+# Eliminar curso
+@app.route("/api/eliminar-curso/<int:id>", methods=["DELETE"])
+def eliminar_curso(id):
+    conec = conectar_bd()
+    cursor = conec.cursor(buffered=True)
+
+    cursor.execute("SELECT id FROM cursos WHERE id = %s", (id,))
+    validar = cursor.fetchone()
+
+    if validar is None:
+        cursor.close()
+        conec.close()
+        return {"Mensaje": "El curso no existe"}, 404
+
+    cursor.execute("DELETE FROM cursos WHERE id = %s", (id,))
+    conec.commit()
+
+    cursor.close()
+    conec.close()
+
+    return {"Mensaje": f"Curso con ID {id} eliminado correctamente"}, 200
+
+
+#-----------------HOJA DE VIDA-----------------
+
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
