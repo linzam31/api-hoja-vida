@@ -298,5 +298,150 @@ def eliminar_estudio(id):
     return {"Mensaje": f"Estudio con ID {id} eliminado correctamente"}
 
 
+
+
+#------------ EXPERIENCIA LABORAL -------------
+
+#registro experiencia laboral
+@app.route("/api/registro-experiencia/<int:id>", methods = ["POST"])
+def registro_experiencia(id):
+    conec = conectar_bd()
+    cursor = conec.cursor(buffered=True)
+    datos = request.json
+    
+    cursor.execute("SELECT id FROM hojas_vida WHERE id = %s", (id,))
+    validar = cursor.fetchone()
+    
+    if validar is None:
+        cursor.close()
+        conec.close()
+        return {"Mensaje": "El id ingresado no existe"}, 404
+
+    sql = """INSERT INTO experiencias (hoja_vida_id, empresa, cargo, tiempo, funciones) 
+             VALUES (%s, %s, %s, %s, %s)"""
+    valor = (
+        id,
+        datos["empresa"],
+        datos["cargo"],
+        datos["tiempo"],
+        datos["funciones"]
+    )
+    
+    cursor.execute(sql, valor)
+    conec.commit()
+    
+    id_generado = cursor.lastrowid
+    cursor.close()
+    conec.close()
+    return {"Mensaje": "Experiencia laboral creada", "id": id_generado}, 201
+
+
+#Consultar experiencias laborales de una hoja de vida
+@app.route("/api/experiencias-hv/<int:id>", methods=["GET"])
+def experiencias_hoja_vida(id):
+    conec = conectar_bd()
+    cursor = conec.cursor(dictionary=True)
+    sql = """
+            SELECT h.id AS hoja_vida_id, e.id AS id_experiencia, e.empresa, e.cargo, e.tiempo, e.funciones
+            FROM hojas_vida h
+            INNER JOIN experiencias e ON h.id = e.hoja_vida_id
+            WHERE h.id = %s
+          
+          """
+    cursor.execute(sql, (id,))
+    datos = cursor.fetchall()
+          
+    cursor.close()
+    conec.close()
+    
+    if not datos:
+        return {"Mensaje": "No se encontró la hoja de vida"}, 404
+    if datos[0]['id_experiencia'] is None:
+        return {"Mensaje": "No se encontraron experiencias para esta hoja de vida"}, 404
+    return datos, 200
+
+
+#consultar experiencias por id
+@app.route("/api/experiencias/<int:id>", methods=["GET"])
+def consultar_experiencia(id):
+    conec = conectar_bd()
+    cursor = conec.cursor(dictionary=True)
+    
+    cursor.execute("SELECT * FROM experiencias WHERE id = %s", (id,))
+    experiencia = cursor.fetchone()
+    
+    cursor.close()
+    conec.close()
+    
+    if experiencia is None:
+        return {"Mensaje": "Experiencia no encontrada"}, 404
+        
+    return {
+        "Mensaje": "Experiencia encontrada",
+        "datos": experiencia
+    }
+
+
+# actualizar experiencia
+@app.route("/api/actualizar-experiencia/<int:id>", methods=["PUT"])
+def actualizar_experiencia(id):
+    conec = conectar_bd()
+    cursor = conec.cursor()
+    
+    cursor.execute("SELECT id FROM experiencias WHERE id = %s", (id,))
+    existe = cursor.fetchone()
+    
+    if existe is None:
+        cursor.close()
+        conec.close()
+        return {"Mensaje": "La experiencia no existe"}, 404
+        
+    datos = request.json
+    
+    sql = """UPDATE experiencias 
+             SET empresa=%s, cargo=%s, tiempo=%s, funciones=%s 
+             WHERE id=%s"""
+             
+    valores = (
+        datos["empresa"],
+        datos["cargo"],
+        datos["tiempo"],
+        datos["funciones"],
+        id
+    )
+    
+    cursor.execute(sql, valores)
+    conec.commit()
+    
+    cursor.close()
+    conec.close()
+
+    return {"Mensaje": f"Experiencia con ID {id} actualizada correctamente"}
+
+
+# eliminar experiencia
+@app.route("/api/eliminar-experiencia/<int:id>", methods=["DELETE"])
+def eliminar_experiencia(id):
+    conec = conectar_bd()
+    cursor = conec.cursor()
+    
+    cursor.execute("SELECT id FROM experiencias WHERE id = %s", (id,))
+    existe = cursor.fetchone()
+    
+    if existe is None:
+        cursor.close()
+        conec.close()
+        return {"Mensaje": "La experiencia no existe"}, 404
+        
+    cursor.execute("DELETE FROM experiencias WHERE id = %s", (id,))
+    conec.commit()
+    
+    cursor.close()
+    conec.close()
+    return {"Mensaje": f"Experiencia con ID {id} eliminada correctamente"}
+
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
