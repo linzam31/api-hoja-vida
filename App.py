@@ -673,7 +673,101 @@ def eliminar_curso(id):
 
 
 #-----------------HOJA DE VIDA-----------------
-
+@app.route("/api/hoja-vida-completa/<int:id>", methods=["GET"])
+def obtener_hoja_vida_completa(id):
+    conec = conectar_bd()
+    # Usamos dictionary=True para que nos entregue las columnas con sus nombres
+    cursor = conec.cursor(dictionary=True)
+    
+    sql = """
+        SELECT 
+            h.id AS id_hoja, h.nombre, h.edad, h.ciudad, h.correo, h.fotografia, h.programa, h.ficha, h.jornada,
+            e.id AS id_estudio, e.nivel, e.institucion, e.titulo, e.anio_graduacion, 
+            c.id AS id_curso, c.nombre AS nombre_curso, 
+            ex.id AS id_experiencia, ex.empresa, ex.cargo, ex.tiempo, ex.funciones, 
+            ha.id AS id_habilidad, ha.nombre AS nombre_habilidad
+        FROM hojas_vida h 
+        LEFT JOIN estudios e ON h.id = e.hoja_vida_id
+        LEFT JOIN cursos c ON h.id = c.hoja_vida_id 
+        LEFT JOIN experiencias ex ON h.id = ex.hoja_vida_id 
+        LEFT JOIN habilidades ha ON ha.experiencias_id = ex.id 
+        WHERE h.id = %s
+    """
+    cursor.execute(sql, (id,))
+    filas = cursor.fetchall()
+    
+    cursor.close()
+    conec.close()
+    
+    # 1. Si no hay filas, la hoja de vida no existe
+    if not filas:
+        return {"Mensaje": "No se encontró la hoja de vida"}, 404
+        
+    # 2. Estructurar el objeto principal con los datos del usuario (tomados de la primera fila)
+    primera_fila = filas[0]
+    hoja_vida = {
+        "id": primera_fila["id_hoja"],
+        "nombre": primera_fila["nombre"],
+        "edad": primera_fila["edad"],
+        "ciudad": primera_fila["ciudad"],
+        "correo": primera_fila["correo"],
+        "fotografia": primera_fila["fotografia"],
+        "programa": primera_fila["programa"],
+        "ficha": primera_fila["ficha"],
+        "jornada": primera_fila["jornada"],
+        "estudios": [],
+        "cursos": [],
+        "experiencias": [],
+        "habilidades": []
+    }
+    
+    # Listas auxiliares para controlar qué IDs ya agregamos y evitar duplicados
+    estudios_agregados = set()
+    cursos_agregados = set()
+    experiencias_agregadas = set()
+    habilidades_agregadas = set()
+    
+    # 3. Recorrer todas las filas para extraer los datos de las tablas relacionadas
+    for fila in filas:
+        # Agrupar Estudios
+        if fila["id_estudio"] and fila["id_estudio"] not in estudios_agregados:
+            hoja_vida["estudios"].append({
+                "id": fila["id_estudio"],
+                "nivel": fila["nivel"],
+                "institucion": fila["institucion"],
+                "titulo": fila["titulo"],
+                "anio_graduacion": fila["anio_graduacion"]
+            })
+            estudios_agregados.add(fila["id_estudio"])
+            
+        # Agrupar Cursos
+        if fila["id_curso"] and fila["id_curso"] not in cursos_agregados:
+            hoja_vida["cursos"].append({
+                "id": fila["id_curso"],
+                "nombre_curso": fila["nombre_curso"]
+            })
+            cursos_agregados.add(fila["id_curso"])
+            
+        # Agrupar Experiencias
+        if fila["id_experiencia"] and fila["id_experiencia"] not in experiencias_agregadas:
+            hoja_vida["experiencias"].append({
+                "id": fila["id_experiencia"],
+                "empresa": fila["empresa"],
+                "cargo": fila["cargo"],
+                "tiempo": fila["tiempo"],
+                "funciones": fila["funciones"]
+            })
+            experiencias_agregadas.add(fila["id_experiencia"])
+            
+        # Agrupar Habilidades
+        if fila["id_habilidad"] and fila["id_habilidad"] not in habilidades_agregadas:
+            hoja_vida["habilidades"].append({
+                "id": fila["id_habilidad"],
+                "nombre_habilidad": fila["nombre_habilidad"]
+            })
+            habilidades_agregadas.add(fila["id_habilidad"])
+            
+    return hoja_vida, 200
 
 
 
