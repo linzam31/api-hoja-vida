@@ -2,9 +2,7 @@ from flask import Flask, request
 from database import conectar_bd
 from flask_cors import CORS
 app = Flask(__name__)
-CORS (app) #comunicación de flask con react
-
-app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["POST", "GET", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type"]}})
 
 @app.route("/")
 def inicio():
@@ -20,41 +18,68 @@ def probar_bd():
     }
 
 #registro
-@app.route("/api/registro-hoja-vida", methods = ["POST"])
+@app.route("/api/registro-hoja-vida", methods=["POST"])
 def registro_hoja_vida():
-    conec = conectar_bd()
-    cursor = conec.cursor(buffered=True)
     datos = request.json
-    nuevo_correo = datos["correo"]
+    conec = conectar_bd()
+    cursor = conec.cursor()
     
-    # Consultar si el correo ya existe
-    cursor.execute("SELECT correo FROM hojas_vida WHERE correo = %s", [nuevo_correo])
-    consultar = cursor.fetchone()
+    # 1. Extraer los textos planos reales de forma segura cuidando la anidación de React
+    if isinstance(datos.get("correo"), dict):
+        # Si viene anidado (el error de React), los extraemos desde el sub-diccionario
+        sub_diccionario = datos["correo"]
+        nuevo_correo = sub_diccionario.get("correo")
+        nombre = sub_diccionario.get("nombre")
+        edad = sub_diccionario.get("edad")
+        ciudad = sub_diccionario.get("ciudad")
+        programa = sub_diccionario.get("programa")
+        ficha = sub_diccionario.get("ficha")
+        jornada = sub_diccionario.get("jornada")
+        fotografia = sub_diccionario.get("foto")  # En el print decía 'foto'
+    else:
+        # Si en algún momento viene limpio, los extrae directo
+        nuevo_correo = datos.get("correo")
+        nombre = datos.get("nombre")
+        edad = datos.get("edad")
+        ciudad = datos.get("ciudad")
+        programa = datos.get("programa")
+        ficha = datos.get("ficha")
+        jornada = datos.get("jornada")
+        fotografia = datos.get("fotografia")
+
+    # 2. Validar duplicado con la variable limpia
+    cursor.execute("SELECT correo FROM hojas_vida WHERE correo = %s", (nuevo_correo,))
+    existe = cursor.fetchone()
     
-    if consultar:
+    if existe:
         cursor.close()
         conec.close()
-        return {"Mensaje": "El correo ya existe"}, 400
+        return {"Mensaje": "El correo ya está registrado"}, 400
 
+    # 3. Insertar usando únicamente variables limpias (Strings puros)
     sql = """INSERT INTO hojas_vida (nombre, edad, ciudad, correo, fotografia, programa, ficha, jornada) 
              VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+             
     valor = (
-        datos["nombre"],
-        datos["edad"],
-        datos["ciudad"],
-        datos["correo"],
-        datos.get("fotografia"),
-        datos["programa"],
-        datos["ficha"],
-        datos["jornada"]
+        nombre,
+        edad,
+        ciudad,
+        nuevo_correo,
+        fotografia,
+        programa,
+        ficha,
+        jornada
     )
+    
     cursor.execute(sql, valor)
     conec.commit()
     
     id_generado = cursor.lastrowid
     cursor.close()
     conec.close()
-    return {"Mensaje": "Hoja de vida creada", "id": id_generado}, 201
+    
+    return {"Mensaje": "Hoja de vida registrada con éxito", "id": id_generado}, 201
+
 
 #listar
 @app.route("/api/hojas-vida")
@@ -164,6 +189,7 @@ def actualizar_hv(id):
 def estudios_hoja_vida(id):
     conec = conectar_bd()
     cursor = conec.cursor(dictionary=True)
+
     sql = """
             SELECT h.id AS hoja_vida_id, e.id AS id_estudio, e.nivel, e.institucion, e.titulo, e.anio_graduacion
             FROM hojas_vida h
@@ -184,7 +210,7 @@ def estudios_hoja_vida(id):
     return datos, 200
 
 
-#registro
+#registro 
 @app.route("/api/registro-estudios/<int:id>", methods = ["POST"])
 def registro_estudios(id):
     conec = conectar_bd()
