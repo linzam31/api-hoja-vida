@@ -333,7 +333,7 @@ def eliminar_estudio(id):
 @app.route("/api/registro-experiencia/<int:id>", methods = ["POST"])
 def registro_experiencia(id):
     conec = conectar_bd()
-    cursor = conec.cursor(buffered=True)
+    cursor = conec.cursor()
     datos = request.json
     
     cursor.execute("SELECT id FROM hojas_vida WHERE id = %s", (id,))
@@ -344,17 +344,23 @@ def registro_experiencia(id):
         conec.close()
         return {"Mensaje": "El id ingresado no existe"}, 404
 
+    lista_experiencias = datos.get("experiencias", [])
+
     sql = """INSERT INTO experiencias (hoja_vida_id, empresa, cargo, tiempo, funciones) 
-             VALUES (%s, %s, %s, %s, %s)"""
-    valor = (
-        id,
-        datos["empresa"],
-        datos["cargo"],
-        datos["tiempo"],
-        datos["funciones"]
-    )
-    
-    cursor.execute(sql, valor)
+             VALUES (%s, %s, %s, %s, %s)""" 
+
+    for experiencias in lista_experiencias: 
+        if isinstance(experiencias,dict):
+
+            valores_experiencias = (
+                id,
+                experiencias.get("empresa"),
+                experiencias.get("cargo"),
+                experiencias.get("tiempo"),
+                experiencias.get("funciones")
+            )
+            
+            cursor.execute(sql, valores_experiencias)
     conec.commit()
     
     id_generado = cursor.lastrowid
