@@ -491,14 +491,16 @@ def registro_habilidades(id):
         conec.close()
         return {"Mensaje": "El id ingresado no existe"}, 404
 
+    lista_habilidades = datos.get("habilidades",[])
+    
     sql = """INSERT INTO habilidades (experiencias_id, nombre) 
              VALUES (%s, %s)"""
-    valor = (
-        id,
-        datos["nombre"]
-    )
-    
-    cursor.execute(sql, valor)
+             
+    for habilidades in lista_habilidades:
+        if isinstance(habilidades, dict):      
+            habilidades.get("nombre")
+        
+        cursor.execute(sql,(id, habilidades))
     conec.commit()
     
     id_generado = cursor.lastrowid
@@ -596,14 +598,16 @@ def registro_cursos(id):
         conec.close()
         return {"Mensaje": "El id ingresado no existe"}, 404
 
+    lista_cursos = datos.get("cursos",[])
+
     sql = """INSERT INTO cursos (hoja_vida_id, nombre) 
              VALUES (%s, %s)"""
-    valor = (
-        id,
-        datos["nombre"]
-    )
-    
-    cursor.execute(sql, valor)
+             
+    for cursos in lista_cursos:
+        if isinstance(cursos,dict):    
+                cursos.get("nombre")
+                
+        cursor.execute(sql, (id, cursos))
     conec.commit()
     
     id_generado = cursor.lastrowid
