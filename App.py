@@ -9,6 +9,71 @@ CORS(app)
 def inicio():
     return "Api hoja de vida funcionamiento"
 
+
+@app.route("/api/registro_usuario", methods=["POST"])
+def regis_usu():
+    datos = request.json
+    
+    nombre = datos.get("nombre")
+    correo = datos.get("correo")
+    password = datos.get("password")
+    rol = datos.get("rol")
+    estado = datos.get("estado")
+    fecha_creacion = datos.get("fecha_creacion")
+
+    # Validar que la contraseña tenga entre 8 y 15 caracteres
+    if not password or len(password) < 8 or len(password) > 15:
+        return {"Mensaje": "La contraseña debe tener entre 8 y 15 caracteres"}, 400
+
+    # validar que no se envien campos vacíos
+    campos = {
+        "nombre" : nombre,
+        "correo" : correo,
+        "password" : password,
+        "rol" : rol,
+        "estado" : estado,
+        "fecha_creacion" : fecha_creacion
+    }
+
+    for campo, valor_campo in campos.items():
+        if valor_campo is None or str(valor_campo).strip()=="":
+            return{"Mensage": f"El campo '{campo}' no puede estar vacío"}, 400
+
+
+    conec = conectar_bd()
+    cursor = conec.cursor()
+
+
+    # Validar que el correo no esté registrado
+    cursor.execute("SELECT correo FROM usuarios WHERE correo = %s", (correo,))
+    existe = cursor.fetchone()
+
+    if existe:
+        cursor.close()
+        conec.close()
+        return {"Mensaje": "El correo ya está registrado"}, 400
+
+    # Insertar los datos del usuario
+    sql = """INSERT INTO usuarios (nombre, correo, password, rol, estado, fecha_creacion) 
+             VALUES (%s, %s, %s, %s, %s, %s)"""
+             
+    valores = (nombre, correo, password, rol, estado, fecha_creacion)
+
+    cursor.execute(sql, valores)
+    conec.commit()
+
+    cursor.close()
+    conec.close()
+
+    return {"Mensaje": "Usuario registrado con éxito"}, 201
+
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    pass
+
+
+
 @app.route("/probar")
 def probar_bd():
     conec = conectar_bd()
