@@ -1,10 +1,39 @@
-from flask import Flask, request
-from database import conectar_bd
 from flask_cors import CORS
+from flask import Flask, request, jsonify
+from database import conectar_bd
+import os
+from functools import wraps
+from dotenv import load_dotenv
+load_dotenv()
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+    get_jwt
+)
 
+from werkzeug.security import(generate_password_hash, check_password_hash)
 app = Flask(__name__)
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+if not app.config["JWT_SECRET_KEY"]:
+    raise RuntimeError("NO SE ENCONTRÓ LA LLAVE JWT")
+jwt = JWTManager(app)
 CORS(app)  
 
+def rol_requerido(rol):
+    def decorador(funcion):
+        @wraps(funcion)
+        @jwt_required()
+        def wrapper(*args,**kwargs):
+            claims = get_jwt()
+
+            if claims.get("rol") != rol:
+                return jsonify({"mensaje: No tiene permiso para acceder"})
+            return funcion(*args,**kwargs)
+        return wrapper
+    return decorador
+            
 @app.route("/")
 def inicio():
     return "Api hoja de vida funcionamiento"
@@ -70,8 +99,35 @@ def regis_usu():
 
 @app.route("/api/login", methods=["POST"])
 def login():
-    pass
+    datos = request.get_json()
+    correo = datos.get("correo", "").strip().lower()
+    password = datos.get("password", "")
+    
+    cursor.execute("""SELECT id, nombre, correo, password, rol, estado FROM usuarios WHERE correo = %s""", (correo,))
+    usuario = cursor.fetchone()
 
+    if not usuario or not check_password_hash(
+        usuario ["password"], password
+    ):
+        return jsonify({"mensaje": "Correo o contraseña incorrectos"}), 401
+    
+    if not usuario["estado"]:
+        return jsonify({"mensaje": "Cuenta desactivada"}), 403
+    
+    token = create_access_token (
+        identity=str(usuario ["id"]),
+        additional_claims={"rol": usuario ["rol"]}
+    )
+    return jsonify({
+        "mensaje": "Inicio de sesión correcto",
+        "token": token,
+        "usuario": {
+            "id": usuario["id"],
+            "nombre": usuario ["nombre"],
+            "correo": usuario ["correo"],
+            "rol": usuario ["rol"]
+        }
+    }), 200
 
 
 @app.route("/probar")
@@ -85,6 +141,7 @@ def probar_bd():
 
 #registro
 @app.route("/api/registro-hoja-vida", methods=["POST"])
+@jwt_required()
 def registro_hoja_vida():
     datos = request.json
     conec = conectar_bd()
@@ -149,6 +206,8 @@ def registro_hoja_vida():
 
 #listar
 @app.route("/api/hojas-vida")
+@rol_requerido("reclutador")
+@jwt_required()
 def obtener_hojasvida():
     conec = conectar_bd()
 
@@ -163,6 +222,7 @@ def obtener_hojasvida():
 
 #Consultar hoja de vida por ID
 @app.route("/api/hojas-vida/<int:id>", methods=["GET"])
+@jwt_required()
 def obtener_hojasvidaid(id):
     conec = conectar_bd()
     cursor = conec.cursor(dictionary=True) # Usamos dictionary para mapear columnas a JSON
@@ -183,6 +243,7 @@ def obtener_hojasvidaid(id):
 
 # eliminar hoja de vida
 @app.route("/api/eliminarhv/<int:id>", methods=["DELETE"])
+@jwt_required()
 def eliminar_hv(id):
     conec = conectar_bd()
     cursor = conec.cursor()
@@ -206,6 +267,7 @@ def eliminar_hv(id):
 
 # actualizar hoja de vida
 @app.route("/api/actualizarhv/<int:id>", methods=["PUT"])
+@jwt_required()
 def actualizar_hv(id):
     conec = conectar_bd()
     cursor = conec.cursor()
@@ -252,6 +314,7 @@ def actualizar_hv(id):
 
 #Consultar estudios de la hoja de vida
 @app.route("/api/estudios-hoja-vida/<int:id>", methods=["GET"])
+@jwt_required()
 def estudios_hoja_vida(id):
     conec = conectar_bd()
     cursor = conec.cursor(dictionary=True)
@@ -278,6 +341,7 @@ def estudios_hoja_vida(id):
 
 #registro 
 @app.route("/api/registro-estudios/<int:id>", methods = ["POST"])
+@jwt_required()
 def registro_estudios(id):
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
@@ -312,6 +376,7 @@ def registro_estudios(id):
 
 #consultar estudios por id
 @app.route("/api/estudios/<int:id>", methods=["GET"])
+@jwt_required()
 def consultar_estudio(id):
     conec = conectar_bd()
     cursor = conec.cursor(dictionary=True)
@@ -333,6 +398,7 @@ def consultar_estudio(id):
 
 # actualizar estudio
 @app.route("/api/actualizar-estudio/<int:id>", methods=["PUT"])
+@jwt_required()
 def actualizar_estudio(id):
     conec = conectar_bd()
     cursor = conec.cursor()
@@ -370,6 +436,7 @@ def actualizar_estudio(id):
 
 # eliminar estudio
 @app.route("/api/eliminar-estudio/<int:id>", methods=["DELETE"])
+@jwt_required()
 def eliminar_estudio(id):
     conec = conectar_bd()
     cursor = conec.cursor()
@@ -396,6 +463,7 @@ def eliminar_estudio(id):
 
 #registro experiencia laboral
 @app.route("/api/registro-experiencia/<int:id>", methods = ["POST"])
+@jwt_required()
 def registro_experiencia(id):
     conec = conectar_bd()
     cursor = conec.cursor()
@@ -436,6 +504,7 @@ def registro_experiencia(id):
 
 #Consultar experiencias laborales de una hoja de vida
 @app.route("/api/experiencias-hv/<int:id>", methods=["GET"])
+@jwt_required()
 def experiencias_hoja_vida(id):
     conec = conectar_bd()
     cursor = conec.cursor(dictionary=True)
@@ -461,6 +530,7 @@ def experiencias_hoja_vida(id):
 
 #consultar experiencias por id
 @app.route("/api/experiencias/<int:id>", methods=["GET"])
+@jwt_required()
 def consultar_experiencia(id):
     conec = conectar_bd()
     cursor = conec.cursor(dictionary=True)
@@ -482,6 +552,7 @@ def consultar_experiencia(id):
 
 # actualizar experiencia
 @app.route("/api/actualizar-experiencia/<int:id>", methods=["PUT"])
+@jwt_required()
 def actualizar_experiencia(id):
     conec = conectar_bd()
     cursor = conec.cursor()
@@ -519,6 +590,7 @@ def actualizar_experiencia(id):
 
 # eliminar experiencia
 @app.route("/api/eliminar-experiencia/<int:id>", methods=["DELETE"])
+@jwt_required()
 def eliminar_experiencia(id):
     conec = conectar_bd()
     cursor = conec.cursor()
@@ -543,6 +615,7 @@ def eliminar_experiencia(id):
 
 #registro habilidades
 @app.route("/api/registro-habilidades/<int:id>", methods = ["POST"])
+@jwt_required()
 def registro_habilidades(id):
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
@@ -576,6 +649,7 @@ def registro_habilidades(id):
 
 # Consultar habilidades de una experiencia laboral
 @app.route("/api/habilidades-exp/<int:id>", methods=["GET"])
+@jwt_required()
 def consultar_habilidades_experiencia(id):
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
@@ -599,6 +673,7 @@ def consultar_habilidades_experiencia(id):
 
 #actualizar habilidad
 @app.route("/api/actualizar-habilidad/<int:id>", methods=["PUT"])
+@jwt_required()
 def actualizar_habilidad(id):
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
@@ -625,6 +700,7 @@ def actualizar_habilidad(id):
 
 #eliminar habilidad
 @app.route("/api/eliminar-habilidad/<int:id>", methods=["DELETE"])
+@jwt_required()
 def eliminar_habilidad(id):
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
@@ -650,6 +726,7 @@ def eliminar_habilidad(id):
 
 #registro cursos
 @app.route("/api/registro-cursos/<int:id>", methods = ["POST"])
+@jwt_required()
 def registro_cursos(id):
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
@@ -683,6 +760,7 @@ def registro_cursos(id):
 
 # Consultar cursos de una hoja de vida
 @app.route("/api/cursos-hv/<int:id>", methods=["GET"])
+@jwt_required()
 def consultar_cursos(id):
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
@@ -706,6 +784,7 @@ def consultar_cursos(id):
 
 # Consultar curso por ID
 @app.route("/api/curso/<int:id>", methods=["GET"])
+@jwt_required()
 def consultar_curso(id):
     conec = conectar_bd()
     cursor = conec.cursor(dictionary=True)
@@ -727,6 +806,7 @@ def consultar_curso(id):
 
 # Actualizar curso
 @app.route("/api/actualizar-curso/<int:id>", methods=["PUT"])
+@jwt_required()
 def actualizar_curso(id):
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
@@ -753,6 +833,7 @@ def actualizar_curso(id):
 
 # Eliminar curso
 @app.route("/api/eliminar-curso/<int:id>", methods=["DELETE"])
+@jwt_required()
 def eliminar_curso(id):
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
@@ -776,6 +857,7 @@ def eliminar_curso(id):
 
 #-----------------HOJA DE VIDA-----------------
 @app.route("/api/hoja-vida-completa/<int:id>", methods=["GET"])
+@jwt_required()
 def obtener_hoja_vida_completa(id):
     conec = conectar_bd()
     # Usamos dictionary=True para que nos entregue las columnas con sus nombres
