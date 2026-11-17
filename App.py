@@ -29,7 +29,7 @@ def rol_requerido(rol):
             claims = get_jwt()
 
             if claims.get("rol") != rol:
-                return jsonify({"mensaje: No tiene permiso para acceder"})
+                return jsonify({"mensaje": "No tiene permiso para acceder"}), 403
             return funcion(*args,**kwargs)
         return wrapper
     return decorador
@@ -90,7 +90,7 @@ def regis_usu():
     password_hash = generate_password_hash(password)
     
     sql = """INSERT INTO usuarios (nombre, correo, password, rol) 
-             VALUES (%s, %s, %s, 'Aprendiz')"""
+             VALUES (%s, %s, %s, 'aprendiz')"""
              
     valores = (nombre, correo, password_hash)
 
@@ -150,8 +150,9 @@ def probar_bd():
 
 #registro
 @app.route("/api/registro-hoja-vida/<int:id>", methods=["POST"])
+@rol_requerido("aprendiz")
 @jwt_required()
-def registro_hoja_vida():
+def registro_hoja_vida(id):
     datos = request.json
     conec = conectar_bd()
     cursor = conec.cursor()
@@ -189,7 +190,7 @@ def registro_hoja_vida():
         return {"Mensaje": "El correo ya está registrado"}, 400
 
     # 3. Insertar usando únicamente variables limpias (Strings puros)
-    sql = """INSERT INTO hojas_vida (nombre, edad, ciudad, correo, fotografia, programa, ficha, jornada, id) 
+    sql = """INSERT INTO hojas_vida (nombre, edad, ciudad, correo, fotografia, programa, ficha, jornada, usuario_id) 
              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
              
     valor = (
