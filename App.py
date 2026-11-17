@@ -42,31 +42,34 @@ def inicio():
 @app.route("/api/registro_usuario", methods=["POST"])
 def regis_usu():
     datos = request.json
+
+    if not datos:
+        return jsonify({"Mensaje": "No se recibieron datos"}), 400
     
     nombre = datos.get("nombre")
     correo = datos.get("correo")
     password = datos.get("password")
-    rol = datos.get("rol")
-    estado = datos.get("estado")
-    fecha_creacion = datos.get("fecha_creacion")
+
+    if not nombre or not correo or not password:
+        return jsonify({"Mensaje": "Todos los campos son obligatorios"}), 400
 
     # Validar que la contraseña tenga entre 8 y 15 caracteres
     if not password or len(password) < 8 or len(password) > 15:
         return {"Mensaje": "La contraseña debe tener entre 8 y 15 caracteres"}, 400
 
     # validar que no se envien campos vacíos
-    campos = {
-        "nombre" : nombre,
-        "correo" : correo,
-        "password" : password,
-        "rol" : rol,
-        "estado" : estado,
-        "fecha_creacion" : fecha_creacion
-    }
+#    campos = {
+ #       "nombre" : nombre,
+  #      "correo" : correo,
+   #     "password" : password,
+    #    "rol" : rol,
+     #   "estado" : estado,
+      #  "fecha_creacion" : fecha_creacion
+    #}
 
-    for campo, valor_campo in campos.items():
-        if valor_campo is None or str(valor_campo).strip()=="":
-            return{"Mensage": f"El campo '{campo}' no puede estar vacío"}, 400
+    #for campo, valor_campo in campos.items():
+     #   if valor_campo is None or str(valor_campo).strip()=="":
+      #      return{"Mensage": f"El campo '{campo}' no puede estar vacío"}, 400
 
 
     conec = conectar_bd()
@@ -83,10 +86,13 @@ def regis_usu():
         return {"Mensaje": "El correo ya está registrado"}, 400
 
     # Insertar los datos del usuario
-    sql = """INSERT INTO usuarios (nombre, correo, password, rol, estado, fecha_creacion) 
-             VALUES (%s, %s, %s, %s, %s, %s)"""
+
+    password_hash = generate_password_hash(password)
+    
+    sql = """INSERT INTO usuarios (nombre, correo, password, rol) 
+             VALUES (%s, %s, %s, 'Aprendiz')"""
              
-    valores = (nombre, correo, password, rol, estado, fecha_creacion)
+    valores = (nombre, correo, password_hash)
 
     cursor.execute(sql, valores)
     conec.commit()
@@ -99,6 +105,9 @@ def regis_usu():
 
 @app.route("/api/login", methods=["POST"])
 def login():
+    conec = conectar_bd()
+    cursor = conec.cursor(dictionary=True)
+
     datos = request.get_json()
     correo = datos.get("correo", "").strip().lower()
     password = datos.get("password", "")
@@ -140,7 +149,7 @@ def probar_bd():
     }
 
 #registro
-@app.route("/api/registro-hoja-vida", methods=["POST"])
+@app.route("/api/registro-hoja-vida/<int:id>", methods=["POST"])
 @jwt_required()
 def registro_hoja_vida():
     datos = request.json
@@ -180,8 +189,8 @@ def registro_hoja_vida():
         return {"Mensaje": "El correo ya está registrado"}, 400
 
     # 3. Insertar usando únicamente variables limpias (Strings puros)
-    sql = """INSERT INTO hojas_vida (nombre, edad, ciudad, correo, fotografia, programa, ficha, jornada) 
-             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+    sql = """INSERT INTO hojas_vida (nombre, edad, ciudad, correo, fotografia, programa, ficha, jornada, id) 
+             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
              
     valor = (
         nombre,
@@ -191,7 +200,8 @@ def registro_hoja_vida():
         fotografia,
         programa,
         ficha,
-        jornada
+        jornada,
+        id
     )
     
     cursor.execute(sql, valor)
